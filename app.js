@@ -2,7 +2,9 @@ require("dotenv").config();
 const express = require("express");
 const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
-const md5 = require("md5");
+const bcrypt = require("bcrypt");
+
+const saltRounds = 10;
 
 const app = express();
 app.use(express.static("public"));
@@ -32,18 +34,20 @@ app.get("/register", function (req, res) {
 
 app.post("/login", function (req, res) {
     const username = req.body.username;
-    const password = md5(req.body.password);
+    const password = req.body.password;
 
     User.findOne({
         email: username
     })
         .then((result) => {
             if (result) {
-                if ( password === result.password) {
-                    res.render("secrets");
-                } else {
-                    res.render("login");
-                }
+                bcrypt.compare(password, result.password, function (err, matches) {
+                    if (matches) {
+                        res.render("secrets");
+                    } else {
+                        res.render("login");
+                    }
+                });
             } else {
                 res.render("login");
             }
@@ -54,19 +58,20 @@ app.post("/login", function (req, res) {
 });
 
 app.post("/register", function (req, res) {
-    console.log(req.body.username);
-    console.log(req.body.password);
-    const newUser = new User({
-        email: req.body.username,
-        password: md5(req.body.password)
-    });
-    newUser.save()
-        .then((result) => {
-            res.render("secrets");
-        })
-        .catch((err) => {
-            res.render(err);
+    bcrypt.hash(req.body.password, saltRounds, function (err, hash) {
+        const newUser = new User({
+            email: req.body.username,
+            password: hash
         });
+        newUser.save()
+            .then((result) => {
+                res.render("secrets");
+            })
+            .catch((err) => {
+                res.render(err);
+            });
+    });
+
 });
 
 app.listen(3000, function () {
